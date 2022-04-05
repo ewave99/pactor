@@ -1,0 +1,20 @@
+{ dup 3 % 0 == swap 5 % 0 == swap { drop 'Fizz' } { drop '' } ifelse swap { drop 'Buzz' } { drop '' } ifelse concat dup bool ! { drop drop dup } { drop } ifelse }
+'fizzbuzz-replace' define ( int -- str )
+
+{ { 50 } 'limit' define 0 dup limit < { drop dup fizzbuzz-replace . 1 + dup limit < } while }
+'fizzbuzz' define ( -- )
+
+{ fizzbuzz }
+'main' define
+
+main
+
+WORDS
+
+VARIABLES
+
+DATA STACK
+
+BLOCK STACK
+{ definitions: {}, commands: [] }
+{ definitions: {}, commands: [] }
