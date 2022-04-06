@@ -1,227 +1,130 @@
-class Stack:
+
+
+class App:
 
     def __init__(self):
-        self._list = list()
+        self.interpreter = Interpreter()
 
-    def __repr__(self):
-        string = ""
-        for x in self._list:
-            string += "{} ".format(repr(x))
-        string += "<- TOP"
-        return string
-
-    def __len__(self):
-        return len(self._list)
-
-    def push(self, item):
-        self._list.append(item)
-
-    def pop(self):
-        return self._list.pop()
-
-class Block:
-
-    def __init__(self, commands, definitions=dict()):
-        self.commands = commands
-        self.definitions = definitions
-
-    def toDict(self):
-        return { 'definitions': self.definitions, 'commands': self.commands }
-
-    def __repr__(self):
-        return repr(self.toDict())
-
-    def updateDefinitions(self, name, block):
-        self.definitions[name] = block
-
-
-class Machine:
-
-    def __init__(self):
-        self.data_stack = Stack()
-        self.builtins = {
-            'define' : self.createDefinition,
-            'round'  : self.createOneValFunction(round),
-            'int'    : self.createOneValFunction(int  ),
-            'float'  : self.createOneValFunction(float),
-            'str'    : self.createOneValFunction(str  ),
-            'bool'   : self.createOneValFunction(bool ),
-            '+'      : self.createTwoValFunction(lambda a, b: a +  b),
-            '-'      : self.createTwoValFunction(lambda a, b: a -  b),
-            '*'      : self.createTwoValFunction(lambda a, b: a *  b),
-            '/'      : self.createTwoValFunction(lambda a, b: a /  b),
-            '%'      : self.createTwoValFunction(lambda a, b: a %  b),
-            '**'     : self.createTwoValFunction(lambda a, b: a ** b),
-            '&'      : self.createTwoValFunction(lambda a, b: a &  b),
-            '|'      : self.createTwoValFunction(lambda a, b: a |  b),
-            'drop'   : self.drop,
-            'dup'    : self.dup,
-            'swap'   : self.swap,
-            'clear'  : self.clear,
-            '.'      : self.output,
-            '.s'     : self.outputDataStack,
-            'if'     : self.if_,
-            'ifelse' : self.ifelse,
-            'while'  : self.while_
-        }
-        self.block_stack = Stack()
-
-    def decodeTokens(self, tokens, definitions):
-        for i, token in enumerate(tokens):
-            self.decodeToken(i, token, definitions)
-
-    def decodeToken(self, i, token, definitions):
-        if token == "{":
-            return lambda x: None
-        if token == "}":
-            return lambda x: None
-
-        if token in self.builtins:
-            return self.builtins[token]
-
-        # handle strings with both single and double quotation marks
-        if len(token) >= 2 and token[0] == '"' and token[-1] == '"':
-            # token represents a string
-            return self.createPushFunction(token[1:-1])
-        if len(token) >= 2 and token[0] == "'" and token[-1] == "'":
-            # token represents a string
-            return self.createPushFunction(token[1:-1])
-
-        is_int = True
-        try:
-            int_value = int(token)
-        except:
-            is_int = False
-        if is_int:
-            return self.createPushFunction(int_value)
-
-        is_float = True
-        try:
-            float_value = float(token)
-        except:
-            is_float = False
-        if is_float:
-            return self.createPushFunction(float_value)
-
-        return createDefinitionExecutionFunction(token)
-
-    def createDefinitionExecutionFunction(self, token):
-        def func():
-            block = self.block_stack.pop()
-            if token not in block.definitions:
-                raise Exception("Unknown word: {}".format(token))
-            executeBlock(block.definitions[token])
-
-    def createDefinition(self):
-        block = self.data_stack.pop()
-        name = self.data_stack.pop()
-        if not isinstance(name, str):
-            raise Exception("Definition name must be string.")
-        parent = self.block_stack.pop()
-        parent.updateDefinitions(name, block)
-        self.block_stack.push(parent)
-
-    def createOneValFunction(self, meta_function):
-        def func():
-            a = self.data_stack.pop()
-            self.data_stack.push(meta_function(a))
-        return func
-
-    def createTwoValFunction(self, meta_function):
-        def func():
-            b = self.data_stack.pop()
-            a = self.data_stack.pop()
-            self.data_stack.push(meta_function(a, b))
-        return func
-
-    def createPushFunction(self, item):
-        def push():
-            self.data_stack.push(item)
-        return push
-
-    def drop(self):
-        self.data_stack.pop()
-
-    def dup(self):
-        a = self.data_stack.pop()
-        self.data_stack.push(a)
-        self.data_stack.push(a)
-
-    def swap(self):
-        b = self.data_stack.pop()
-        a = self.data_stack.pop()
-        self.data_stack.push(b)
-        self.data_stack.push(a)
-
-    def clear(self):
-        while self.data_stack:
-            self.data_stack.pop()
-
-    def output(self):
-        print(self.data_stack.pop())
-
-    def outputDataStack(self):
-        print(repr(self.data_stack))
-
-    def if_(self):
-        block = self.data_stack.pop()
-        flag = self.data_stack.pop()
-        self.data_stack.push(flag)
-        if bool(flag) == True:
-            self.executeBlock(block)
-
-    def ifelse(self):
-        block_else = self.data_stack.pop()
-        block_if = self.data_stack.pop()
-        flag = self.data_stack.pop()
-        self.data_stack.push(flag)
-        if bool(flag) == True:
-            self.executeBlock(block_if)
-        else:
-            self.executeBlock(block_else)
-
-    def while_(self):
-        block = self.data_stack.pop()
-        flag = self.data_stack.pop()
-        self.data_stack.push(flag)
-        while flag:
-            self.executeBlock(block)
-            flag = self.data_stack.pop()
-            self.data_stack.push(flag)
-
-
+    def run(self):
+        while True:
+            user_input = input()
+            self.interpreter.run(user_input)
 
 
 class Interpreter:
 
     def __init__(self):
         self.machine = Machine()
-        self.tokens = []
 
-    def run(self):
-        while True:
-            try:
-                self.fetchInput()
-                self.decodeInput()
-                self.executeCommands()
-            except Exception as e:
-                print(e)
+    def run(self, user_input):
+        words = user_input.split(' ')
+        for word in words:
+            self.machine.execute(word)
 
-    def fetchInput(self):
-        self.tokens = input().split()
 
-    def decodeInput(self):
-        try:
-            self.commands = self.machine.decodeTokens(self.tokens, dict())
-        except Exception as e:
-            raise e
+class Machine:
 
-    def executeCommands(self):
-        try:
-            self.machine.executeCommands(self.commands)
-        except Exception as e:
-            raise e
+    def __init__(self):
+        self.block_level = 0
+        self.stack = Block(self.block_level)
+        self.hierarchy_stack = Block(0)
+        self.current_defs = self.hierarchy_stack.defs
+
+    def execute(self, word):
+        if word == "{":
+            self.block_level += 1
+            block = Block(self.block_level)
+            block.defs.update(self.current_defs)
+            self.stack.push(block)
+            self.hierarchy_stack.push(block)
+
+        elif word == "}":
+            b = self.stack.pop()
+            # if block b is not closed
+            if self.block_level >= b.level:
+                # close it
+                self.block_level -= 1
+
+
+            # if we have already closed the last block
+            # then we are closing the parent
+            else:
+                # Revert the defs to the parent.
+                # If the block does not have a parent:
+                if b.level <= 1:
+                    self.stack.push(b)
+                    self.current_defs = self.stack.defs
+                else:
+                    # we are using a block as a temporary stack here
+                    children_stack = Block(0)
+                    children_stack.push(b)
+                    child = self.stack.pop()
+                    while not (isinstance(child, Block) and child.level < self.block_level):
+                        children_stack.push(child)
+                        child = self.stack.pop()
+                    parent = child
+                    while children_stack:
+                        child = children_stack.pop()
+                        parent.push(child)
+                    self.stack.push(parent)
+                    self.current_defs = parent.defs
+
+        elif word == ".s":
+            print(self.stack)
+
+        else:
+            if self.block_level <= 0:
+                if word == "define":
+                    name_block = self.stack.pop()
+                    if not isinstance(name_block, block):
+                        raise exception("definition name should be block with length 1.")
+                    if len(block) != 1:
+                        raise exception("invalid name for definition.")
+                    code_block = self.stack.pop()
+                    if not isinstance(code_block, block):
+                        raise exception("definition body must be block.")
+                    name = name_block.items[0]
+                    self.stack.defs[name] = code_block
+
+                elif word in self.stack.defs:
+                    self.executeBlock(self.stack.defs[word])
+            else:
+                top = self.stack.pop()
+                top.push(word)
+                self.stack.push(top)
+
+    def executeBlock(self, block):
+        pass
+
+
+class Block:
+
+    def __init__(self, level):
+        self.level = level
+        self.items = list()
+        self.defs = dict()
+        self.closed = False
+
+    def __len__(self):
+        return len(self.items)
+
+    def __iter__(self):
+        yield from self.items
+
+    def __repr__(self):
+        string = "{ "
+        for item in self.items:
+            string += "{} ".format(repr(item))
+        string += "}"
+        string += ":{}".format(self.level)
+        return string
+
+    def push(self, item):
+        self.items.append(item)
+
+    def pop(self):
+        return self.items.pop()
 
 if __name__ == "__main__":
-    app = Interpreter()
+    app = App()
     app.run()
