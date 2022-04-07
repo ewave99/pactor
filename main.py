@@ -248,13 +248,34 @@ class WordBuilder:
         machine.scope_stack.push(scope)
 
     def while_(self, machine):
-        pass
+        block = machine.stack.pop()
+        if not isinstance(block, Block):
+            raise Exception("Invalid while body, must be a code block.")
+        flag = machine.stack.peek()
+        while flag:
+            block.execute(machine)
+            flag = machine.stack.peek()
 
     def if_(self, machine):
-        pass
+        block = machine.stack.pop()
+        if not isinstance(block, Block):
+            raise Exception("Invalid if body, must be a code block.")
+        flag = machine.stack.peek()
+        if flag:
+            block.execute(machine)
 
     def ifelse(self, machine):
-        pass
+        block_else = machine.stack.pop()
+        if not isinstance(block_else, Block):
+            raise Exception("Invalid ifelse body, must be a code block.")
+        block_if = machine.stack.pop()
+        if not isinstance(block_if, Block):
+            raise Exception("Invalid ifelse body, must be a code block.")
+        flag = machine.stack.peek()
+        if flag:
+            block_if.execute(machine)
+        else:
+            block_else.execute(machine)
 
 
 class Word:
