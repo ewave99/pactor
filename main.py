@@ -171,6 +171,7 @@ class WordBuilder:
 
         self.builtins["define"] = self.define
         self.builtins["while"] = self.while_
+        self.builtins["dowhile"] = self.dowhile
         self.builtins["if"] = self.if_
         self.builtins["ifelse"] = self.ifelse
 
@@ -251,6 +252,16 @@ class WordBuilder:
         block = machine.stack.pop()
         if not isinstance(block, Block):
             raise Exception("Invalid while body, must be a code block.")
+        flag = machine.stack.peek()
+        while flag:
+            block.execute(machine)
+            flag = machine.stack.peek()
+
+    def dowhile(self, machine):
+        block = machine.stack.pop()
+        if not isinstance(block, Block):
+            raise Exception("Invalid dowhile body, must be a code block.")
+        block.execute(machine)
         flag = machine.stack.peek()
         while flag:
             block.execute(machine)
