@@ -7,7 +7,7 @@
     swap
     { drop 'Buzz }
     { drop ' } ifelse
-    concat dup bool not
+    + dup bool not
     { drop drop dup } { drop } ifelse
 }
 'fizzbuzz-replace define

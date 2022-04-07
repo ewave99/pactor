@@ -5,15 +5,32 @@ class App:
     
     def __init__(self):
         self.interpreter = Interpreter()
-
+        self.user_input = None
+    
     def run(self):
-        while True:
-            try:
-                user_input = input()
-            except EOFError:
-                sys.exit(0)
+        if len(sys.argv) == 1:
+            self.runRepl()
+        elif len(sys.argv) > 1:
+            self.runWithFile(sys.argv[1])
 
-            self.interpreter.processInput(user_input)
+    def runRepl(self):
+        while True:
+            self.handleUserInput()
+            self.processInput(self.user_input)
+
+    def runWithFile(self, filename):
+        with open(filename, 'r') as file:
+            for line in file:
+                self.processInput(line)
+
+    def processInput(self, input_text):
+        self.interpreter.processInput(input_text)
+
+    def handleUserInput(self):
+        try:
+            self.user_input = input()
+        except EOFError:
+            sys.exit(0)
 
 
 class Interpreter:
@@ -25,7 +42,7 @@ class Interpreter:
         tokens = user_input.split(' ')
         try:
             for token in tokens:
-                self.machine.processToken(token)
+                self.machine.processToken(token.strip())
         except Exception as e:
             print(e)
 
@@ -38,27 +55,49 @@ class Machine:
         self.scope_stack.push(dict())
 
         self.word_builder = WordBuilder()
+        self.literal_builder = LiteralBuilder()
 
-        self.do_execute = True
+        self.parsing_block_level = 0
 
     def processToken(self, token):
-        item = self.getItem(token)
-        if self.do_execute or token == "}":
-            item.execute(self)
-        else:
-            block = self.stack.pop()
-            block.addChild(item)
-            self.stack.push(block)
+        if not token:
+            return
+        if token != "{" and token != "}":
+            if self.parsing_block_level == 0:
+                item = self.getItem(token)
+                item.execute(self)
+            else:
+                block = self.stack.pop()
+                block.addChild(token)
+                self.stack.push(block)
+        elif token == "{":
+            if self.parsing_block_level == 0:
+                item = self.getItem(token)
+                item.execute(self)
+                self.parsing_block_level += 1
+            else:
+                block = self.stack.pop()
+                block.addChild(token)
+                self.stack.push(block)
+                self.parsing_block_level += 1
+        elif token == "}":
+            if self.parsing_block_level > 1:
+                block = self.stack.pop()
+                block.addChild(token)
+                self.stack.push(block)
+            self.parsing_block_level -= 1
+        #print(self.stack)
+        #print(self.parsing_block_level)
 
     def getItem(self, token):
         is_string = token[0] == "'"
         if is_string:
-            item = Literal(str, token[1:])
+            item = self.literal_builder.fromIdentifier(str, token[1:])
             return item
 
         is_int = True
         try:
-            item = Literal(int, token)
+            item = self.literal_builder.fromIdentifier(int, token)
         except ValueError:
             is_int = False
         if is_int:
@@ -66,7 +105,7 @@ class Machine:
 
         is_float = True
         try:
-            item = Literal(float, token)
+            item = self.literal_builder.fromIdentifier(float, token)
         except ValueError:
             is_float = False
         if is_float:
@@ -79,17 +118,6 @@ class Machine:
             is_word = False
         if is_word:
             return item
-
-    def getDefinition(self, token):
-        scope = self.getScope()
-        if token in scope:
-            return scope[token]
-        raise Exception("Unknown token: {}".format(token))
-
-    def getScope(self):
-        if not self.scope_stack:
-            return dict()
-        return self.scope_stack.peek()
 
 
 class Stack:
@@ -165,11 +193,13 @@ class WordBuilder:
         self.builtins["drop"] = self.drop
         self.builtins["dup"] = self.dup
         self.builtins["swap"] = self.swap
+        self.builtins["rot"] = self.rot
 
         self.builtins["{"] = self.blockStart
         self.builtins["}"] = self.blockEnd
 
         self.builtins["define"] = self.define
+        self.builtins["do"] = self.do
         self.builtins["while"] = self.while_
         self.builtins["dowhile"] = self.dowhile
         self.builtins["if"] = self.if_
@@ -183,7 +213,18 @@ class WordBuilder:
     def getWordFunction(self, machine, token):
         if token in self.builtins:
             return self.builtins[token]
-        return machine.getDefinition(token)
+        return self.getDefinition(machine, token)
+
+    def getDefinition(self, machine, token):
+        scope = self.getScope(machine)
+        if token in scope:
+            return scope[token]
+        raise Exception("Unknown token: {}".format(token))
+
+    def getScope(self, machine):
+        if not machine.scope_stack:
+            return dict()
+        return machine.scope_stack.peek()
 
     def createOneValFunction(self, base_func):
 
@@ -229,24 +270,39 @@ class WordBuilder:
         machine.stack.push(b)
         machine.stack.push(a)
 
+    def rot(self, machine):
+        c = machine.stack.pop()
+        b = machine.stack.pop()
+        a = machine.stack.pop()
+        machine.stack.push(b)
+        machine.stack.push(c)
+        machine.stack.push(a)
+
     def blockStart(self, machine):
         block = Block()
         machine.stack.push(block)
-        machine.do_execute = False
 
     def blockEnd(self, machine):
-        machine.do_execute = True
+        pass
 
     def define(self, machine):
         name = machine.stack.pop()
         if not isinstance(name, str):
             raise Exception("Invalid definition name, must be string.")
+        item = machine.stack.pop()
+        scope = machine.scope_stack.pop()
+        if isinstance(item, Block):
+            scope[name] = item.execute
+        else:
+            literal = machine.literal_builder.fromValue(item)
+            scope[name] = literal.execute
+        machine.scope_stack.push(scope)
+
+    def do(self, machine):
         block = machine.stack.pop()
         if not isinstance(block, Block):
-            raise Exception("Invalid definition body, must be a code block.")
-        scope = machine.scope_stack.pop()
-        scope[name] = block.execute
-        machine.scope_stack.push(scope)
+            raise Exception("Invalid do body, must be a code block.")
+        block.execute(machine)
 
     def while_(self, machine):
         block = machine.stack.pop()
@@ -294,6 +350,9 @@ class Word:
     def __init__(self, func):
         self.func = func
 
+    def __repr__(self):
+        return str(self.func)
+
     def execute(self, machine):
         self.func(machine)
 
@@ -303,25 +362,39 @@ class Block:
     def __init__(self):
         self.children = list()
 
+    def __repr__(self):
+        string = "{ "
+        for child in self.children:
+            string += "{} ".format(child)
+        string += "}"
+        return string
+
     def addChild(self, child):
         self.children.append(child)
 
     def execute(self, machine):
         parent_scope = machine.scope_stack.peek()
         scope = parent_scope.copy()
+
         machine.scope_stack.push(scope)
+
         for child in self.children:
-            child.execute(machine)
+            machine.processToken(child)
+
         machine.scope_stack.pop()
 
 
-class Literal:
+class LiteralBuilder:
 
-    def __init__(self, baseclass, identifier):
+    def fromValue(self, value):
+        return Literal(value)
+
+    def fromIdentifier(self, baseclass, identifier):
         if baseclass is str:
-            self.value = self.handleString(identifier)
+            value = self.handleString(identifier)
         else:
-            self.value = baseclass(identifier)
+            value = baseclass(identifier)
+        return Literal(value)
 
     def handleString(self, identifier):
         # replace _ with space unless there is a \ before the _
@@ -339,6 +412,12 @@ class Literal:
                 new_string += identifier[i]
                 i += 1
         return new_string
+
+
+class Literal:
+
+    def __init__(self, value):
+        self.value = value
 
     def execute(self, machine):
         machine.stack.push(self.value)
