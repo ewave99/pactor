@@ -2,26 +2,18 @@
     dup
     3 % 0 = swap
     5 % 0 = swap
-    {
-        drop { Fizz }
-    }
-    {
-        drop { }
-    } ifelse
+    { drop 'Fizz }
+    { drop ' } ifelse
     swap
-    {
-        drop { Buzz }
-    }
-    {
-        drop { }
-    } ifelse
+    { drop 'Buzz }
+    { drop ' } ifelse
     concat dup bool not
     { drop drop dup } { drop } ifelse
 }
-{ fizzbuzz-replace } define
+'fizzbuzz-replace define
 
 {
-    { 50 } { limit } define
+    { 20 } 'limit define
     0 dup limit <
     {
         drop dup
@@ -30,9 +22,6 @@
     }
     while
 }
-{ fizzbuzz } define
+'fizzbuzz define
 
-{ fizzbuzz }
-{ main } define
-
-main
+fizzbuzz
