@@ -1,0 +1,13 @@
+{ dup 3 % 0 = swap 5 % 0 = or }
+'is-multiple? define
+
+1000 'limit define
+
+0
+1 dup limit <
+{
+    drop dup is-multiple?
+    { drop dup rot + swap } { drop } ifelse
+    1 + dup limit <
+} while drop drop
+.
