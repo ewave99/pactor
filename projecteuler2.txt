@@ -1,4 +1,21 @@
 4 10 6 ** * 'limit define
 
-1 2 dup limit < { drop dup rot + dup 2 % 0 = { drop dup . } { drop } ifelse dup limit < } while
-.s
+2
+1 2
+
+dup limit <
+{
+    drop dup rot +
+    dup 2 % 0 =
+    {
+        drop rot swap dup rot + rot rot
+    }
+    {
+        drop
+    }
+    ifelse
+    dup limit <
+}
+while
+
+drop rot .
